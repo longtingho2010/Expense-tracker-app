@@ -1,11 +1,20 @@
-import React, { useLayoutEffect } from "react";
+import React, { useLayoutEffect, useState } from "react";
 import { View, Text, StyleSheet, TextInput } from "react-native";
 import { GlobalStyles } from "../constants/styles";
 import IconButton from "../components/UI/IconButton";
 import { useExpense } from "../store/expenses-context";
 import ExpenseForm from "../components/ManageExpense/ExpenseForm";
+import {
+  deleteExpenseData,
+  storeExpense,
+  updateExpenseData,
+} from "../util/http";
+import Loading from "../components/UI/Loading";
+import Error from "../components/UI/Error";
 
 const ManageExpense = ({ route, navigation }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState();
   const editedExpenseId = route.params?.expenseId;
   const isEditing = !!editedExpenseId;
   const { deleteExpense, updateExpense, addExpense, expenses } = useExpense();
@@ -20,21 +29,48 @@ const ManageExpense = ({ route, navigation }) => {
     });
   }, [isEditing, navigation]);
 
-  const deleteHandler = () => {
-    deleteExpense(editedExpenseId);
-    navigation.goBack();
+  const deleteHandler = async () => {
+    setLoading(true);
+    try {
+      deleteExpense(editedExpenseId);
+      navigation.goBack();
+    } catch (err) {
+      setError("please try again later!!");
+      setLoading(false);
+    }
   };
+
   const cancelHandler = () => {
     navigation.goBack();
   };
-  const confirmHandler = (expenseData) => {
-    if (isEditing) {
-      updateExpense(editedExpenseId, expenseData);
-    } else {
-      addExpense(expenseData);
+
+  const confirmHandler = async (expenseData) => {
+    setLoading(true);
+    try {
+      if (isEditing) {
+        updateExpense(editedExpenseId, expenseData);
+      } else {
+        const id = await storeExpense(expenseData);
+        addExpense({ ...expenseData, id });
+      }
+      navigation.goBack();
+    } catch (err) {
+      setError("Could not save data. Please try again later!!");
+      setLoading(false);
     }
-    navigation.goBack();
   };
+
+  const errorHandler = () => {
+    setError(null);
+  };
+
+  if (error && !loading) {
+    return <Error msg={error} onConfirm={errorHandler} />;
+  }
+
+  if (loading) {
+    return <Loading />;
+  }
   return (
     <View style={styles.container}>
       <ExpenseForm
